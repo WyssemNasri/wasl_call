@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:permission_handler/permission_handler.dart';
 import '../service/PermissionService.dart';
 
 class PermissionGate extends StatefulWidget {
@@ -21,23 +21,39 @@ class _PermissionGateState extends State<PermissionGate> {
   }
 
   Future<void> _initPermissions() async {
-    bool granted = await _permissionService.checkAndRequestPermissions();
+    final denied = await _permissionService.checkAndRequestPermissions();
 
-    if (!granted && mounted) {
+    if (denied.isNotEmpty && mounted) {
+      final permanentlyDenied = await _permissionService.hasPermanentlyDenied(denied);
+
       await showDialog(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text("Permissions requises"),
-          content: const Text(
-              "L'application a besoin d'accéder au micro, caméra, téléphone, Bluetooth et notifications."),
+          content: Text(
+            permanentlyDenied
+                ? "Les permissions suivantes sont bloquées définitivement. Veuillez les autoriser dans les paramètres :\n\n" +
+                denied.map((p) => "- ${_permissionName(p)}").join("\n")
+                : "Les permissions suivantes n'ont pas été accordées :\n\n" +
+                denied.map((p) => "- ${_permissionName(p)}").join("\n"),
+          ),
           actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _initPermissions();
-              },
-              child: const Text("Réessayer"),
-            ),
+            if (permanentlyDenied)
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await openAppSettings();
+                },
+                child: const Text("Ouvrir les paramètres"),
+              )
+            else
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _initPermissions();
+                },
+                child: const Text("Réessayer"),
+              ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text("Ignorer"),
@@ -51,6 +67,23 @@ class _PermissionGateState extends State<PermissionGate> {
       setState(() {
         _ready = true;
       });
+    }
+  }
+
+  String _permissionName(Permission p) {
+    switch (p) {
+      case Permission.microphone:
+        return "Microphone";
+      case Permission.phone:
+        return "Téléphone";
+      case Permission.bluetooth:
+      case Permission.bluetoothConnect:
+      case Permission.bluetoothScan:
+        return "Bluetooth";
+      case Permission.notification:
+        return "Notifications";
+      default:
+        return p.toString().split('.').last;
     }
   }
 

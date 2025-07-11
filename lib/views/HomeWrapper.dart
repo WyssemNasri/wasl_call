@@ -4,6 +4,7 @@ import 'package:wasl_call/service/storage_service.dart';
 
 import '../provider/DialerViewModel.dart';
 import '../widgets/dial_button.dart';
+import 'ringing_screen.dart';  // <-- Import de la nouvelle page
 
 class HomeWrapper extends StatelessWidget {
   final String username;
@@ -18,7 +19,7 @@ class HomeWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => DialerViewModel(),
+      create: (_) => DialerViewModel(storageService),
       child: _HomeWrapperContent(
         username: username,
         storageService: storageService,
@@ -31,7 +32,7 @@ class _HomeWrapperContent extends StatelessWidget {
   final String username;
   final StorageService storageService;
 
-   _HomeWrapperContent({
+  _HomeWrapperContent({
     super.key,
     required this.username,
     required this.storageService,
@@ -128,8 +129,46 @@ class _HomeWrapperContent extends StatelessWidget {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    final error = await dialerVM.makeCall();
-                    if (error != null) _showMessage(error);
+                    final domain = await storageService.read('domain') ?? 'sip.wasel.sa';
+                    final fullNumber = '${dialerVM.enteredNumber}@$domain';
+
+                    if (dialerVM.enteredNumber.isEmpty) {
+                      _showMessage("Please enter a number first.");
+                      return;
+                    }
+
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text("Confirm Call"),
+                        content: Text("Do you want to call:\n$fullNumber"),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Cancel"),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.pop(context); // fermer la popup
+                              final error = await dialerVM.makeCall();
+                              if (error != null) {
+                                _showMessage(error);
+                              } else {
+                                _showMessage('Call launched successfully');
+                                // Naviguer vers RingingScreen
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => RingingScreen(calleeNumber: fullNumber),
+                                  ),
+                                );
+                              }
+                            },
+                            child: const Text("Call"),
+                          ),
+                        ],
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     shape: const CircleBorder(),

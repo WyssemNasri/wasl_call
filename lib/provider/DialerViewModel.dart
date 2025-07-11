@@ -1,8 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:linphone_flutter_plugin/linphoneflutterplugin.dart';
+import '../service/storage_service.dart';
 
 class DialerViewModel extends ChangeNotifier {
   final LinphoneFlutterPlugin _linphone = LinphoneFlutterPlugin();
+  final StorageService _storageService;
+
+  DialerViewModel(this._storageService);
 
   String _enteredNumber = '';
   String get enteredNumber => _enteredNumber;
@@ -22,20 +26,24 @@ class DialerViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
-
   Future<String?> makeCall() async {
     if (_enteredNumber.isEmpty) {
       return 'Please enter a number';
     }
-    final fullNumber = '$_enteredNumber@sip.wasel.sa';
 
     try {
-      _linphone.call(number: fullNumber);
-      return null; // succès, pas de message d'erreur
+      debugPrint('Calling number: $_enteredNumber');
+      // NE PAS concaténer domain ni port, juste le numéro
+      await _linphone.call(number: _enteredNumber);
+      return null;
     } catch (e) {
       return 'Call failed: $e';
     }
   }
+
+
+
+
 
   void clearNumber() {
     _enteredNumber = '';
